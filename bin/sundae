@@ -1,0 +1,166 @@
+#!/usr/bin/env ruby
+
+# == Synopsis
+#
+# (Re)generates directories by mixing the file hierarchies contained
+# in various 'mounted' directories.  
+#
+# == Usage
+#
+#    sundae [options] [commands]
+#
+# For command line details see 
+#    sundae --help
+#
+# == Author
+# <don@ohspite.net>
+#
+# == Copyright
+# Copyright (c) 2012, 2008 <don@ohspite.net>.  
+# Licensed under the MIT License.
+
+require 'optparse'
+require 'highline/import'
+
+$:.unshift File.join(File.dirname(__FILE__), "../lib")
+
+require 'sundae'
+
+class App # :nodoc:
+
+  COMMAND_LIST = %w{run
+                    source
+                    move
+                   }
+
+  def initialize
+    parse_commandline(ARGV)
+
+    Sundae.load_config_file(@options[:config_path])
+
+    case @commands[0]
+    when :run
+      Sundae.update_filesystem
+    when :remove
+      Sundae.remove_filesystem
+    when :sources
+      ARGV << "." if ARGV.empty?
+      Process.abort "#{ARGV[0]} is not a directory." unless File.directory?(ARGV[0])
+      path = File.expand_path(ARGV[0])
+      mnts = Sundae.find_source_directories(path)
+      mnts.each do |mnt|
+        install_location = Sundae.install_location(mnt)
+        relative = path.sub(install_location, '')
+        puts mnt
+        Dir.entries(File.join(mnt, relative)).sort.each do |e|
+          next if e =~ /^..?$/
+          line_end = File.directory?(e) ? "/" : "" 
+          puts "  " + e + line_end
+        end
+        puts
+      end
+    when :move
+      Process.abort "The 'move' command requires a file or directory as an argument." if ARGV.empty?
+      Process.abort "#{ARGV[0]} is not a file or directory." unless File.exist?(ARGV[0])
+
+      if ARGV.size == 1 
+        path = File.expand_path(ARGV[0])      
+        
+        current_mnt = nil
+        Sundae.all_mnts.map do |mnt|
+          current_mnt = mnt if path =~ Regexp.new(mnt)
+        end
+        choices = if current_mnt
+                    Sundae.all_mnts
+                  else
+                    Sundae.find_source_directories(File.dirname(path))
+                  end
+        choices.push "--Cancel?--"
+        choose do |menu|
+          menu.prompt = "move to: "
+          menu.choices(*choices) do |new_path|
+            if new_path == "--Cancel?--" 
+              Process.abort("No move performed.")
+            else
+              Sundae.move_to_mnt(path, new_path)
+            end
+          end
+        end
+      else
+        relative_path = ARGV.pop
+        ARGV.each do |path|
+          path = File.expand_path(path)
+          Sundae.move_to_relative_path(path, relative_path)
+        end
+      end
+    end
+  end
+  
+  private
+  
+  def parse_commandline(option_line)
+    options = {:verbose => false}
+    option_parser = OptionParser.new do |opts|
+      opts.banner = "Usage: #{File.basename(__FILE__)} [options] [command]"
+      opts.separator ""
+      opts.separator "Available commands (can be abbreviated):"
+      opts.separator '    run             create the filesystem from the mounts; the default command'
+      opts.separator '    rm              remove generated directories and symlinks'
+      opts.separator '    move PATH       moves the resource at \'path\' (or pointed to by \'path\' if it is a link) to another mount collection'
+      opts.separator '    sources DIR=./  print the mounts that have resources in \'dir\' and what comes from each'
+      opts.separator ""
+      opts.separator "Specific options:"
+      opts.on('-c', 
+              '--config-path PATH',
+              'specify the path to the \'.sundae\' directory (default is \'~/.sundae\'); used with the regular \'run\' command') do |path|
+        options[:config_path] = File.expand_path(path)
+      end
+#       opts.on('-v', 
+#               '--verbose',
+#               'verbose output') do
+#         options[:verbose] = true
+#       end
+      opts.separator ""
+      opts.separator "Common options:"
+      opts.on('-h', 
+              '--help',
+              'show the help message') do
+        puts opts
+        exit
+      end
+      opts.on('-a', 
+              '--about', 
+              'show the about message') do
+        RDoc::usage
+      end
+    end
+    
+    argv = Array.new
+    commands = Array.new
+    if option_line.empty? then option_line = ['run'] end
+    option_parser.order!(option_line) do |input|
+      action = case input
+               when nil then :run
+               when /^ru?n?$/ then :run
+               when /^re?m?o?v?e?$/ then :remove
+               when /^so?u?r?c?e?s?$/ then :sources
+               when /^mo?v?e?$/ then :move
+               else nil
+               end
+      if action.nil? 
+        argv << input
+      else
+        commands << action
+      end
+    end
+    argv.each { |a| option_line << a }
+
+    if commands.empty? then Process.abort "No command unambiguously specified." end
+    if commands.size > 1 then Process.abort "More than one command specified." end
+
+    @options = options
+    @commands = commands
+  end
+end
+
+App.new

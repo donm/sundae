@@ -1,0 +1,155 @@
+= Sundae
+
+== Synopsis
+
+(Re)generates directories by mixing the file hierarchies contained in
+various 'mounted' directories.  The generated directories contain
+symbolic links to the mounted files.  Combined with other tools (to
+sync files), this scheme allows you to create separate collections of
+files (work, personal, reference, linux, osx, etc.), choose which of
+these you want to mount on each of your computers, and then build a
+hierarchy that allows you to work on them side by side.
+
+For example, let's take your bash config files.  You want to separate
+startup commands that you use on all unix computers from those that
+you only need on Linux or OS X.  Plus maybe you have some aliases that
+you use only at work and some that you need only at home.  
+
+Rewrite your .bashrc to load everything in ~/etc/bash.  Store that
+file and your other bash config files in a folder with just general
+*nix bash stuff.  Then use Sundae to create links in ~/etc/bash to all
+of the things that you need for your particular computer (general unix
+stuff + either linux or OS X stuff + work aliases + ...).  The files
+are together in one folder so your script knows to read them, but they
+can be version controlled and/or synced across all of your computers
+in separate bundles (one for *nix, one for ubuntu, one for OS X,
+etc.).
+
+You have to figure out how to use this model.  It's not for everyone.
+It requires rewriting config files, making sure certain files kept in
+different folders don't have the same name, etc.  But it's worth it
+when you sit down at a new computer and say "I only want to use my
+*nix and linux config files, my work files, and music" and it all just
+works. Like this:
+
+    ~> ls
+    Desktop  local  mnt  src  WualaDrive
+    ~> sundae
+    ~> ls
+    bin  Desktop  doc  etc  lib  local  mnt  share  src  tmp  var  WualaDrive
+
+== Install
+
+  sudo gem install sundae
+
+== Usage
+
+The first time you run Sundae, it will create a template config file
+in your home directory.  This file, <tt>.sundae</tt>, needs to be
+customized.  It is just a Ruby file that defines the following:
+
+[+configatron.paths+]          
+  array; where the collections are stored
+[+configatron.ignore_rules+]
+  array; each element is a string or Regexp and becomes a rule that prevents
+  links to files or directories that match the Regexp.  Globs in strings are expanded.
+
+The hierarchy in <em>path</em> should look something like
+this:
+
+  path/
+  |-- collection1/
+  |   |-- mnt1/
+  |   |   |-- real_files_and_dirs
+  |   |   ` ...
+  |   |-- mnt2/
+  `-- collection2/
+      ` ...
+
+Why is this double layer "collection" stuff going on?  Because while
+most of the time you can share a whole folder between computers,
+sometimes you want to mix your config files into a folder that also
+contains nonsymlinked files.
+
+For example, your ~/.ssh folder probably has a public and private key
+that you want to stay unique to that machine, but you might want to
+mix in a "config" file that has host aliases that you share between
+machines.  This is how you do that.  I do it with my .unison, .mocp,
+.ssh, and .lftp folders.
+
+For example, the hierarchy in my <em>path</em>s looks sort of like this:
+
+  ~/mnt/git/             <-- "path"
+  |-- nix/               <-- "collection"
+  |   |-- home/          <-- "mnt"
+  |   |   |-- .emacs.d/     (~/.emacs.d will point here)
+  |   |   |-- etc/          (~/etc will point here)
+  |   |   ` ...
+  |   |-- dot-unison
+  |   |   |-- .sundae_path  (says "~/.unison")
+  |   |   |-- default.prf   (~/.unison/default.prf will point here)
+  |   |   `
+  |   |
+  |-- osx/   
+  |   |-- home_library/     (says "~/Library")
+  |   |   |-- .sundae_path
+  |   |   `-- Library-Keyboard_Layouts/
+  |   |       `-- Keyboard Layouts/
+  |   |           ` Colemak.keylayout
+  |   |
+  |-- personal
+  |   `-- home/
+  |       |-- doc/
+  |       |   ` ...
+  |       ` ... 
+  ` ...    
+  ~/mnt/sync/            <-- "path"
+  |-- reference          <-- "collection"
+  |   |-- home/          <-- "mnt"
+  |       ` ...
+  |-- music
+  |   |-- home/          
+  |       ` ...
+  ` ...
+
+Sundae will act on all of the <em>mnt</em>s--subdirectories of the
+<em>collection</em>s, that is, the sub-subdirectories of the
+<em>path</em>.  The "collections" are only there to facilitate
+grouping common files and syncronizing them between computers.
+
+By default, all of the contents in each of the <em>mnt</em>s are
+placed in the user's home directory.  This can be altered by
+creating a file called <tt>.sundae_path</tt> in the top of the
+<em>mnt</em>; the file should contain one line, which is the
+absolute path to where that directory should be "mounted."
+
+And that's it.  When called, Sundae creates links so that you can
+work on your files from seperate parts of life as if they were side
+by side.  
+
+== Author
+<don@ohspite.net>
+
+== Copyright
+Copyright (c) 2011, 2008 <don@ohspite.net>.  
+Licensed under the MIT License.
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+'Software'), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
