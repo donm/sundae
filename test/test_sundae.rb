@@ -118,6 +118,12 @@ class TestSundae < Test::Unit::TestCase
     assert_equal 1, Sundae.generated_directories.size
   end
 
+  def test_class_generated_files
+    Sundae.create_filesystem
+#    assert Sundae.generated_files.include?(File.join(@@sandbox, 'f11'))
+    assert_equal 7, Sundae.generated_files.size
+  end
+
   def test_class_ignore_file_eh
     assert Sundae.ignore_file?('.sundae_path')
     assert Sundae.ignore_file?('..')
@@ -156,7 +162,7 @@ class TestSundae < Test::Unit::TestCase
   end
 
   def test_class_mnts_in_path
-    assert_equal ['c1/d1', 'c1/d2', 'c2/d1', 'c2/d3'].map{|x| Pathname.new(x)},
+    assert_equal ['c1/d1', 'c1/d2', 'c2/d1', 'c2/d3'].map {|x| Pathname.new(x)},
         Sundae.mnts_in_path(@@path1)
   end
 
@@ -165,7 +171,6 @@ class TestSundae < Test::Unit::TestCase
     (@@sandbox + 'perm_file').open('w')
     FileUtils.ln_s(File.join(@@sandbox, 'temp_file'), File.join(@@sandbox, 'link'))
     (@@sandbox + 'temp_file').delete
-    assert_equal [@@sandbox + 'link'], Sundae.remove_dead_links
     assert ! (@@sandbox + 'link').exist?
     assert (@@sandbox + 'perm_file').exist?
   end
@@ -179,12 +184,9 @@ class TestSundae < Test::Unit::TestCase
   end
 
   def test_class_root_path
-    assert_equal Sundae.root_path(File.join(@@mnts_dir, 'c1')).to_s, File.join(@@mnts_dir, 'c1')
-    assert_equal Sundae.root_path(File.join(@@mnts_dir, 'c1/d1')).to_s, File.join(@@mnts_dir, 'c1')
-
-    assert_raise ArgumentError do
-      Sundae.root_path('/')
-    end
+    assert_equal @@mnts_dir +'c1',  Sundae.root_path(@@mnts_dir + 'c1')
+    assert_equal @@mnts_dir + 'c1', Sundae.root_path(@@mnts_dir + 'c1/d1')
+    assert_equal nil,               Sundae.root_path('/')
   end
 
   def test_class_create_link
