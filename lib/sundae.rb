@@ -220,7 +220,6 @@ module Sundae
 
   def self.remove_generated_stuff(fod)
     return unless fod.exist?
-    puts fod
     if fod.ftype == 'directory'
       fod.each_child do |c|
         remove_generated_stuff c
@@ -300,7 +299,7 @@ module Sundae
   def self.create_file_link(target, link_name) 
     raise ArgumentError, "#{target} does not exist" unless File.file?(target)
     if File.exist?(link_name)
-      raise ArgumentError, "#{link_name} cannot be overwritten" unless File.symlink?(link_name)
+      raise ArgumentError, "#{link_name} cannot be overwritten for #{target}." unless File.symlink?(link_name)
       if (not File.exist?(File.readlink(link_name)))
         FileUtils.ln_sf(target, link_name)
       else
