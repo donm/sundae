@@ -204,6 +204,7 @@ module Sundae
   def self.create_filesystem
     mnt_list = []
     all_mnts.each do |mnt|
+      FileUtils.mkdir_p(File.expand_path(install_location(mnt)))
       minimally_create_links(mnt, install_location(mnt))
       mnt_list << mnt 
     end
