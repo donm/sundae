@@ -2,6 +2,7 @@
 require 'configatron'
 require 'fileutils'
 require 'find'
+require 'pathname'
 
 # A collection of methods to mix the contents of several directories
 # together using symbolic links.
@@ -13,20 +14,20 @@ module Sundae
   # :startdoc:
   VERSION = ::File.read(PATH + 'version.txt').strip
 
-  DEFAULT_CONFIG_FILE = File.expand_path(File.join(ENV['HOME'], '.sundae'))
+  DEFAULT_CONFIG_FILE = (Pathname.new(Dir.home) + '.sundae').expand_path
  
   @config_file = DEFAULT_CONFIG_FILE
 
   # Read configuration from <tt>.sundae</tt>.
   #
   def self.load_config_file(config_file = DEFAULT_CONFIG_FILE)
-    config_file ||= DEFAULT_CONFIG_FILE
-    config_file = File.join(config_file, '.sundae') if File.directory?(config_file)
+    config_file = Pathname.new(config_file).expand_path
+    config_file += '.sundae' if config_file.directory?
 
-    create_template_config_file(config_file) unless File.file?(config_file)
+    create_template_config_file(config_file) unless config_file.file?
 
     load(config_file)
-    configatron.paths.map! { |p| File.expand_path(p) }
+    configatron.paths.map! { |p| Pathname.new(p).expand_path }
 
     # An array which lists the directories where mnts are stored.
     @paths = configatron.paths
@@ -39,13 +40,14 @@ module Sundae
   # asking the user.
   #
   def self.create_template_config_file(config_file)
+    config_file = Pathname.new(config_file)
     loop do
       print "#{config_file} does not exist.  Create template there? (y/n): "
       ans = gets.downcase.strip
       if ans == "y" || ans == "yes"
         File.open(config_file, "w") do |f|
           f.puts <<-EOM.gsub(/^ {14}/, '')
-              # -*-Ruby-*-
+              # -*-Ruby-*- 
 
               # An array which lists the directories where mnts are stored.
               configatron.paths = ["~/mnt"]
@@ -76,13 +78,15 @@ module Sundae
   # ignored (i.e., no link will be made pointing to it).
   #
   def self.ignore_file?(file) # :doc:
-    return true if File.basename(file) =~ /^\.\.?$/
-    return true if File.basename(file) == ".sundae_path"
+    file = Pathname.new(file)
+    basename = file.basename.to_s
+    return true if basename =~ /^\.\.?$/
+    return true if basename == ".sundae_path"
     @ignore_rules.each do |r| 
       if r.kind_of? Regexp
-        return true if File.basename(file) =~ r 
+        return true if basename =~ r 
       else
-        return true if File.fnmatch(r, file)
+        return true if file.fnmatch(r)
       end
     end
     return false
@@ -92,12 +96,13 @@ module Sundae
   # where in the file system links should be created for this mnt.
   #
   def self.install_location(mnt) 
-    mnt_config = File.join(mnt, '.sundae_path')
-    if File.exist?(mnt_config)
-      location = File.readlines(mnt_config)[0].strip
+    mnt = Pathname.new(mnt)
+    mnt_config = mnt + '.sundae_path'
+    if mnt_config.exist?
+      location = Pathname.new(mnt_config.readlines[0].strip).expand_path
     end
-
-    location ||= ENV['HOME']
+    
+    location ||= Pathname.new(Dir.home)
   end
 
   # Return an array of all paths in the file system where links will
@@ -111,11 +116,12 @@ module Sundae
   # as an array.
   #
   def self.mnts_in_path(path) 
+    Pathname.new(path)
     mnts = []
-    collections = Dir.entries(path).delete_if {|a| a=~/^\./}
+    collections = path.entries.delete_if {|a| a.to_s =~ /^\./}
     collections.each do |c|
-      collection_mnts = Dir.entries(File.join(path, c)).delete_if {|a| a=~/^\./}
-      collection_mnts.map! { |mnt| File.join(c, mnt) }
+      collection_mnts = (path + c).entries.delete_if {|a| a.to_s =~ /^\./}
+      collection_mnts.map! { |mnt| (c + mnt) }
       mnts |= collection_mnts # |= is the union
     end
 
@@ -129,7 +135,7 @@ module Sundae
 
     @paths.each do |path| 
       next unless File.exist?(path)
-      mnts |= mnts_in_path(path).map { |mnt| File.join(path, mnt) } # |= is the union operator
+      mnts |= mnts_in_path(path).map { |mnt| path + mnt } # |= is the union operator
     end
 
     return mnts
@@ -144,11 +150,11 @@ module Sundae
     all_mnts.each do |mnt|
       mnt_dirs = Dir.entries(mnt).delete_if { |e| ignore_file?(e) }
       mnt_dirs.each do |dir|
-        dirs << File.join(install_location(mnt), dir)
+        dirs << (install_location(mnt) + dir)
       end
     end
 
-    return dirs.sort.uniq.select { |d| File.directory?(d) }
+    return dirs.sort.uniq.select { |d| d.directory? }
   end
   
   # Check for symlinks in the base directories that are missing their
@@ -157,12 +163,12 @@ module Sundae
   def self.remove_dead_links
     removed_list = []
     install_locations.each do |location|
-      next unless File.exist?(location)
-      files = Dir.entries(location).map {|f| File.join(location, f)}
+      next unless location.exist?
+      files = location.entries.map { |f| location + f }
       files.each do |file|
-        next unless File.symlink?(file)
-        next if File.exist? File.readlink(file)
-        FileUtils.rm(file)
+        next unless file.symlink?
+        next if file.readlink.exist?
+        file.delete
         removed_list << file
       end
     end
@@ -175,14 +181,14 @@ module Sundae
   def self.remove_generated_directories
     removed_list = []
     generated_directories.each do |dir| 
-      next if File.basename(dir) == ('.sundae')
+      next if dir.basename == '.sundae'
 
       # Do a search to make sure no non-symlink file is being
       # deleted. That would suck.
       if sf = find_static_file(dir)
         puts "found static file: #{sf}"
       else
-        FileUtils.rmtree(dir) 
+        dir.rmtree
         removed_list << dir
       end
     end
@@ -193,8 +199,10 @@ module Sundae
   # nil otherwise.
   #
   def self.find_static_file(directory)
-    Find.find(directory) do |path|
-      return path if File.exist?(path) && File.ftype(path) == 'file' 
+    directory = Pathname.new(directory)
+
+    directory.find do |path|
+      return path if path.exist? && path.ftype == 'file' 
     end
     return nil
   end
@@ -204,7 +212,7 @@ module Sundae
   def self.create_filesystem
     mnt_list = []
     all_mnts.each do |mnt|
-      FileUtils.mkdir_p(File.expand_path(install_location(mnt)))
+      install_location(mnt).expand_path.mkpath
       minimally_create_links(mnt, install_location(mnt))
       mnt_list << mnt 
     end
@@ -241,10 +249,10 @@ module Sundae
   # directory that is contained in _@paths_.
   #
   def self.root_path(dir)
-    raise ArgumentError if dir == '/'
+    dir = Pathname.new(dir).expand_path
+    raise ArgumentError if dir.to_s == '/'
 
-    parent = File.expand_path(File.join(dir, '..'))
-    return (@paths.include?(parent)) ? dir : root_path(parent)
+    return (@paths.include?(dir.parent)) ? dir : root_path(dir.parent)
   end
 
   # Dispatch calls to create_directory_link and create_file_link.
@@ -285,18 +293,19 @@ module Sundae
   #
   def self.create_directory_link(target, link_name) 
     raise ArgumentError unless File.directory?(target)
-    if (not File.exist?(link_name)) || (File.symlink?(link_name) && (not File.exist?(File.readlink(link_name))))
+    if (not File.exist?(link_name)) || 
+        (File.symlink?(link_name) && (not File.exist?(File.readlink(link_name))))
       FileUtils.ln_sf(target, link_name)
     else
       case File.ftype(link_name)
       when 'file'
-        raise "Could not link #{target} to #{link_name}"
+        raise "Could not link #{link_name} to #{target}: target exists."
       when 'directory'
         minimally_create_links(target, link_name)
       when 'link'
         case File.ftype(File.readlink(link_name))
         when 'file'
-          raise "Could not link #{target} to #{link_name}"
+          raise "Could not link #{link_name} to #{target}: another link exists there."
         when 'directory'
           combine_directories(link_name, target, File.readlink(link_name))          
         end
@@ -308,6 +317,7 @@ module Sundae
   # <em>target_path1</em> and <em>target_path2</em>.
   #
   def self.combine_directories(link_name, target_path1, target_path2) 
+    raise unless File.symlink?(link_name)
     return if target_path1 == target_path2
     
     FileUtils.rm(link_name)

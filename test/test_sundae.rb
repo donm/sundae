@@ -3,41 +3,34 @@ require 'test/unit'
 $:.unshift File.join(File.dirname(__FILE__), "..", "bin") # add ../bin to the Ruby library path
 $:.unshift File.join(File.dirname(__FILE__), "..", "lib") #     ../lib
 require 'sundae'
+require 'pathname'
 
 class TestSundae < Test::Unit::TestCase
 
-  @@testdir = File.dirname(File.expand_path(__FILE__))
-  @@sandbox = File.join(@@testdir, 'sandbox')
-  @@static_dir = File.join(@@sandbox, 'static')
-  @@mnts_dir = File.join(@@sandbox, 'mnts')
+  @@testdir = Pathname.new(__FILE__).parent.expand_path
+  @@sandbox    = @@testdir + 'sandbox'
+  @@static_dir = @@sandbox + 'static'
+  @@mnts_dir   = @@sandbox + 'mnts'
 
   def setup
-    FileUtils.mkdir_p(@@sandbox)
+    @@sandbox.mkpath
+    @@static_dir.mkpath
 
-    FileUtils.mkdir_p(@@static_dir)
-    File.open(File.join(@@static_dir, 'static'), 'w')
-    FileUtils.mkdir_p(File.join(@@mnts_dir, 'c1'))
-    FileUtils.mkdir_p(File.join(@@mnts_dir, 'c2'))
-    FileUtils.mkdir_p(File.join(@@mnts_dir, 'c1/d1'))
-    FileUtils.mkdir_p(File.join(@@mnts_dir, 'c1/d2'))
-    FileUtils.mkdir_p(File.join(@@mnts_dir, 'c2/d1'))
-    FileUtils.mkdir_p(File.join(@@mnts_dir, 'c2/d3'))
-    FileUtils.mkdir_p(File.join(@@mnts_dir, 'c2/d3/d31'))
-    File.open(File.join(@@mnts_dir, 'c1/d1/f11'), 'w')
-    File.open(File.join(@@mnts_dir, 'c1/d1/f12'), 'w')
-    File.open(File.join(@@mnts_dir, 'c1/d2/f21'), 'w')
-    File.open(File.join(@@mnts_dir, 'c2/d1/f13'), 'w')
-    File.open(File.join(@@mnts_dir, 'c2/d1/f14'), 'w')
-    File.open(File.join(@@mnts_dir, 'c2/d3/f31'), 'w')
-    ['c1/d1', 'c1/d2', 'c2/d1', 'c2/d3'].each do |d|
-      File.open(File.join(@@mnts_dir, d, '.sundae_path'), 'w') do |f|
-        f.puts @@sandbox
-      end
+    (@@static_dir + 'static').open('w')
+    %w(c1 c2 c1/d1 c1/d2 c2/d1 c2/d3 c2/d3/d31).each do |x| 
+      (@@mnts_dir + x).mkpath
+    end
+    
+    %w(c1/d1/f11 c1/d1/f12 c1/d2/f21 c2/d1/f13 c2/d1/f14 c2/d3/f31).each do |x|
+      (@@mnts_dir + x).open('w')
     end
 
-    @@path1 = File.join(@@sandbox, 'mnts')
+    %w(c1/d1 c1/d2 c2/d1 c2/d3).each do |d|
+      (@@mnts_dir + d + '.sundae_path').open('w') {|f| f.puts @@sandbox}
+    end
 
-    @@config_file = File.join(@@sandbox, ".sundae")
+    @@path1 = @@sandbox + 'mnts'
+    @@config_file = @@sandbox + '.sundae'
     File.open(@@config_file, 'w+') do |f|
       f.puts "configatron.paths = [\"#{@@path1}\"]"
       f.puts "configatron.ignore_rules = %w("
@@ -49,24 +42,24 @@ class TestSundae < Test::Unit::TestCase
   end
 
   def teardown
-    FileUtils.rm_r(@@sandbox)
+    @@sandbox.rmtree
   end
 
   def test_class_all_mnts
     all_mnts = Sundae.all_mnts
     mnts = Sundae.mnts_in_path(@@path1)
     mnts.each do |m|
-      assert all_mnts.include?(File.join(@@path1,m))
+      assert all_mnts.include?(@@path1 + m)
     end
   end
 
   def test_class_combine_directories
-    d1 = File.join(@@mnts_dir, 'c1/d1')
-    d2 = File.join(@@mnts_dir, 'c1/d2')
-    link = File.join(@@sandbox, 'link')
+    d1   = @@mnts_dir + 'c1/d1'
+    d2   = @@mnts_dir + 'c1/d2'
+    link = @@sandbox  + 'link'
     FileUtils.ln_s(d1, link)
     Sundae.combine_directories(link, d1, d2)
-    assert File.symlink?(File.join(link, 'f11'))
+    assert File.symlink?(link + 'f11')
   end
 
   def test_class_create_directory_link
@@ -135,45 +128,46 @@ class TestSundae < Test::Unit::TestCase
   end
 
   def test_class_install_location
-    assert_equal Sundae.install_location('/'), ENV['HOME']
-    assert_equal Sundae.install_location(File.join(@@mnts_dir, 'c1/d1')), @@sandbox
+    assert_equal Pathname.new(Dir.home), Sundae.install_location('/')
+    assert_equal @@sandbox, Sundae.install_location(@@mnts_dir + 'c1/d1')
   end
 
   def test_class_install_locations
-    assert_equal Sundae.install_locations, [@@sandbox]
+    assert_equal [@@sandbox], Sundae.install_locations
   end
 
   def test_class_load_config_file
     sundae_paths = Sundae.instance_variable_get(:@paths)
-    assert_equal sundae_paths[0], File.expand_path(@@path1)
+    assert_equal sundae_paths[0], Pathname.new(@@path1).expand_path
   end
 
   def test_class_minimally_create_links
     c1 = File.join(@@mnts_dir, 'c1')
     c2 = File.join(@@mnts_dir, 'c2')
     Sundae.minimally_create_links(c1, @@sandbox)
-    assert File.symlink?(File.join(@@sandbox, 'd1'))
-    assert File.symlink?(File.join(@@sandbox, 'd2'))
+    assert((@@sandbox + 'd1').symlink?)
+    assert((@@sandbox + 'd2').symlink?)
     Sundae.minimally_create_links(c2, @@sandbox)
-    assert File.directory?(File.join(@@sandbox, 'd1'))
-    assert File.symlink?(File.join(@@sandbox, 'd1/f11'))
-    assert File.symlink?(File.join(@@sandbox, 'd1/f14'))
-    assert File.symlink?(File.join(@@sandbox, 'd2'))
-    assert File.symlink?(File.join(@@sandbox, 'd3'))
+    assert((@@sandbox + 'd1').directory?)
+    assert((@@sandbox + 'd1/f11').symlink?)
+    assert((@@sandbox + 'd1/f14').symlink?)
+    assert((@@sandbox + 'd2').symlink?)
+    assert((@@sandbox + 'd3').symlink?)
   end
 
   def test_class_mnts_in_path
-    assert_equal Sundae.mnts_in_path(@@path1), ['c1/d1', 'c1/d2', 'c2/d1', 'c2/d3']
+    assert_equal ['c1/d1', 'c1/d2', 'c2/d1', 'c2/d3'].map{|x| Pathname.new(x)},
+        Sundae.mnts_in_path(@@path1)
   end
 
   def test_class_remove_dead_links
-    File.open(File.join(@@sandbox, 'temp_file'), 'w')
-    File.open(File.join(@@sandbox, 'perm_file'), 'w')
+    (@@sandbox + 'temp_file').open('w')
+    (@@sandbox + 'perm_file').open('w')
     FileUtils.ln_s(File.join(@@sandbox, 'temp_file'), File.join(@@sandbox, 'link'))
-    FileUtils.rm(File.join(@@sandbox, 'temp_file'))
-    assert_equal Sundae.remove_dead_links, [File.join(@@sandbox, 'link')]
-    assert ! File.exist?(File.join(@@sandbox, 'link'))
-    assert File.exist?(File.join(@@sandbox, 'perm_file'))
+    (@@sandbox + 'temp_file').delete
+    assert_equal [@@sandbox + 'link'], Sundae.remove_dead_links
+    assert ! (@@sandbox + 'link').exist?
+    assert (@@sandbox + 'perm_file').exist?
   end
 
   def test_class_remove_generated_directories
@@ -185,8 +179,8 @@ class TestSundae < Test::Unit::TestCase
   end
 
   def test_class_root_path
-    assert_equal Sundae.root_path(File.join(@@mnts_dir, 'c1')), File.join(@@mnts_dir, 'c1')
-    assert_equal Sundae.root_path(File.join(@@mnts_dir, 'c1/d1')), File.join(@@mnts_dir, 'c1')
+    assert_equal Sundae.root_path(File.join(@@mnts_dir, 'c1')).to_s, File.join(@@mnts_dir, 'c1')
+    assert_equal Sundae.root_path(File.join(@@mnts_dir, 'c1/d1')).to_s, File.join(@@mnts_dir, 'c1')
 
     assert_raise ArgumentError do
       Sundae.root_path('/')
