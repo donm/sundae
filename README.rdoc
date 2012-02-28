@@ -38,6 +38,10 @@ works. Like this:
     ~> ls
     bin  Desktop  doc  etc  lib  local  mnt  share  src  tmp  var  WualaDrive
 
+And that's it.  When called, Sundae creates links so that you can
+work on your files from seperate parts of life as if they were side
+by side.  
+
 == Install
 
   sudo gem install sundae
@@ -66,16 +70,22 @@ this:
   `-- collection2/
       ` ...
 
-Why is this double layer "collection" stuff going on?  Because while
-most of the time you can share a whole folder between computers,
-sometimes you want to mix your config files into a folder that also
-contains nonsymlinked files.
+Sundae will act on all of the <em>mnt</em>s--subdirectories of the
+<em>collection</em>s, that is, the sub-subdirectories of the
+<em>path</em>.  The "collections" are only there to facilitate
+grouping common files and syncronizing them between computers.
 
-For example, your ~/.ssh folder probably has a public and private key
-that you want to stay unique to that machine, but you might want to
-mix in a "config" file that has host aliases that you share between
-machines.  This is how you do that.  I do it with my .unison, .mocp,
-.ssh, and .lftp folders.
+By default, all of the contents in each of the <em>mnt</em>s are
+placed in the user's home directory.  This can be altered by creating
+a file called <tt>.sundae_path</tt> in the top of the <em>mnt</em>;
+the file should contain one line, which is the absolute path to where
+that directory should be "mounted."
+
+There's one exception to the "by default everything is placed in the
+home directory" rule.  If the mnt directory starts with "dot-" or
+"dot_" then it is placed in the dot folder formed using the rest of
+the name.  For example, the files in a "dot-ssh" mnt are placed in
+"~/.ssh" by default.
 
 For example, the hierarchy in my <em>path</em>s looks sort of like this:
 
@@ -86,13 +96,13 @@ For example, the hierarchy in my <em>path</em>s looks sort of like this:
   |   |   |-- etc/          (~/etc will point here)
   |   |   ` ...
   |   |-- dot-unison
-  |   |   |-- .sundae_path  (says "~/.unison")
+  |   |   |-- .sundae_path  (says "~/.unison", but not required)
   |   |   |-- default.prf   (~/.unison/default.prf will point here)
   |   |   `
   |   |
   |-- osx/   
-  |   |-- home_library/     (says "~/Library")
-  |   |   |-- .sundae_path
+  |   |-- home_library/     
+  |   |   |-- .sundae_path  (says "~/Library", required)
   |   |   `-- Library-Keyboard_Layouts/
   |   |       `-- Keyboard Layouts/
   |   |           ` Colemak.keylayout
@@ -112,20 +122,30 @@ For example, the hierarchy in my <em>path</em>s looks sort of like this:
   |       ` ...
   ` ...
 
-Sundae will act on all of the <em>mnt</em>s--subdirectories of the
-<em>collection</em>s, that is, the sub-subdirectories of the
-<em>path</em>.  The "collections" are only there to facilitate
-grouping common files and syncronizing them between computers.
+Why is this double layer "collection" stuff going on?  Because while
+most of the time you can share a whole folder between computers,
+sometimes you want to mix your config files into a folder that also
+contains nonsymlinked files.
 
-By default, all of the contents in each of the <em>mnt</em>s are
-placed in the user's home directory.  This can be altered by
-creating a file called <tt>.sundae_path</tt> in the top of the
-<em>mnt</em>; the file should contain one line, which is the
-absolute path to where that directory should be "mounted."
+For example, your ~/.ssh folder probably has a public and private key
+that you want to stay unique to that machine, but you might want to
+mix in a "config" file that has host aliases that you share between
+machines.  You can put the file in "~/mnt/nix/.ssh/config" in the
+above example, and it will get created alongside the other static
+files in the "~/.ssh/" directory.
 
-And that's it.  When called, Sundae creates links so that you can
-work on your files from seperate parts of life as if they were side
-by side.  
+However, every time you run sundae it will check the target locations
+of each file and directory (recursively) in every mnt directory for
+dangling symlinks and other stuff that sundae might have created.  If
+you put the the file in "~/mnt/nix/dot-ssh/config", it will be placed
+in the correct place and only "config" will be checked when sundae is
+run (not all of the other files in "~/.ssh/").  
+
+It obviously doesn't make much of a speed difference in this case, but
+if you're mixing in one file into "~/a/b/c/d/file", and there are lots
+of files beneath "~/a/", then you don't want sundae to look through
+everything every time it runs.  Just put it in a mnt directory with a
+<tt>.sundae_path</tt> of "~/a/b/c/d".
 
 == Author
 <don@ohspite.net>

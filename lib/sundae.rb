@@ -100,10 +100,16 @@ module Sundae
     mnt = Pathname.new(mnt).expand_path
     mnt_config = mnt + '.sundae_path'
     if mnt_config.exist?
-      location = Pathname.new(mnt_config.readlines[0].strip).expand_path
+      return Pathname.new(mnt_config.readlines[0].strip).expand_path
     end
-    
-    location ||= Pathname.new(Dir.home)
+
+    base = mnt.basename.to_s
+    match = (/dot[-_](.*)/).match(base)
+    if match
+      return Pathname.new(Dir.home) + ('.' + match[1])
+    end
+
+    return Pathname.new(Dir.home)
   end
 
   # Return an array of all paths in the file system where links will
