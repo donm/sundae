@@ -1,3 +1,16 @@
+=== 1.0.2 / 2012-02-28
+
+* minor enhancements:
+  * change default location for "dot-" mnt directories
+  * better documentation
+
+
+=== 1.0.1 / 2012-02-27
+
+* minor enhancements:
+  * can place files directly in static directories now
+  * cleaned up code
+
 === 1.0.0 / 2012-02-21
 
 * Backwards incompatible: use Ruby for config file (not YAML)
