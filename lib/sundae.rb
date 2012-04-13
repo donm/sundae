@@ -4,6 +4,14 @@ require 'fileutils'
 require 'find'
 require 'pathname'
 
+unless Dir.respond_to?(:home)
+  class Dir
+    def self.home
+      File.expand_path('~')
+    end
+  end
+end
+
 # A collection of methods to mix the contents of several directories
 # together using symbolic links.
 #
@@ -126,9 +134,11 @@ module Sundae
     Pathname.new(path).expand_path
     mnts = []
     collections = path.children(false).delete_if {|c| c.to_s =~ /^\./}
+
     collections.each do |c|
-      collection_mnts = (path + c).children(false).delete_if {|c| c.to_s =~ /^\./}
+      collection_mnts = (path + c).children(false).delete_if {|kid| kid.to_s =~ /^\./}
       collection_mnts.map! { |mnt| (c + mnt) }
+
       mnts |= collection_mnts # |= is the union
     end
 

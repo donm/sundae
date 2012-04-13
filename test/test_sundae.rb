@@ -20,7 +20,7 @@ class TestSundae < Test::Unit::TestCase
     %w(c1 c2 c1/d1 c1/d2 c2/d1 c2/d3 c2/d3/d31).each do |x| 
       (@@mnts_dir + x).mkpath
     end
-    
+
     %w(c1/d1/f11 c1/d1/f12 c1/d2/f21 c2/d1/f13 c2/d1/f14 c2/d3/f31).each do |x|
       (@@mnts_dir + x).open('w')
     end

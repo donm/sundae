@@ -1,9 +1,14 @@
+=== 1.0.3 / 2012-04-13
+
+* bug fixes for 1.8.*:
+  * monkeypatched a Dir.home method
+  * fixed variable that was shadowed in 1.9, overwritten in 1.8
+
 === 1.0.2 / 2012-02-28
 
 * minor enhancements:
   * change default location for "dot-" mnt directories
   * better documentation
-
 
 === 1.0.1 / 2012-02-27
 
