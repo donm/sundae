@@ -12,6 +12,14 @@ unless Dir.respond_to?(:home)
   end
 end
 
+unless Pathname.instance_methods.include?(:each_child)
+  class Pathname
+    def each_child(with_directory=true, &b)
+      children(with_directory).each(&b)
+    end
+  end
+end
+
 # A collection of methods to mix the contents of several directories
 # together using symbolic links.
 #
