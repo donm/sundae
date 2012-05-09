@@ -152,7 +152,8 @@ module Sundae
         c
       else
         collection_mnts = c.children.delete_if {|kid| kid.basename.to_s =~ /^\./}
-        collection_mnts.keep_if { |k| (path + c + k).directory? }
+        # collection_mnts.keep_if { |k| (path + c + k).directory? }
+        collection_mnts.reject! { |k| ! (path + c + k).directory? }
         collection_mnts.map! { |mnt| (c + mnt) }
       end
     end.flatten.sort.uniq
