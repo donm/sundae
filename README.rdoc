@@ -67,13 +67,30 @@ this:
   |   |   |-- real_files_and_dirs
   |   |   ` ...
   |   |-- mnt2/
-  `-- collection2/
+  |-- collection2_really_a_mnt/
+  |   |-- .sundae_path          <--- empty
+  |   |-- real_files_and_dirs
+  |   |   ` ...
+  `-- collection3/
       ` ...
 
 Sundae will act on all of the <em>mnt</em>s--subdirectories of the
 <em>collection</em>s, that is, the sub-subdirectories of the
 <em>path</em>.  The "collections" are only there to facilitate
 grouping common files and syncronizing them between computers.
+
+This sub-subdirectory business is there so you can, for example, throw
+all of your linux files under version control but have some of them
+inserted into your home directory and some of them go somewhere else.
+
+If you have one collection of files that you syncronize across
+computers that all get deposited into the same path, you don't need a
+collection of mnts.  You can make can make the top level
+directory--that would normally be treated as a collection--be treated
+as a mnt by including a .sundae_path file in that folder (even if it's
+empty).  Like in the 'collection2_really_a_mnt' example above.  It
+seems complicated to have both options, but it's really not.  I
+promise.
 
 By default, all of the contents in each of the <em>mnt</em>s are
 placed in the user's home directory.  This can be altered by creating
