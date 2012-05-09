@@ -162,7 +162,8 @@ class TestSundae < Test::Unit::TestCase
   end
 
   def test_class_mnts_in_path
-    assert_equal ['c1/d1', 'c1/d2', 'c2/d1', 'c2/d3'].map {|x| Pathname.new(x)},
+    md = Pathname.new(@@mnts_dir)
+    assert_equal ['c1/d1', 'c1/d2', 'c2/d1', 'c2/d3'].map {|x| (md + x).expand_path},
         Sundae.mnts_in_path(@@path1)
   end
 
