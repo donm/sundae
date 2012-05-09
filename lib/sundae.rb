@@ -115,8 +115,12 @@ module Sundae
   def self.install_location(mnt) 
     mnt = Pathname.new(mnt).expand_path
     mnt_config = mnt + '.sundae_path'
+
     if mnt_config.exist?
-      return Pathname.new(mnt_config.readlines[0].strip).expand_path
+      line = mnt_config.readlines[0]
+      if line then
+        return Pathname.new(line.strip).expand_path
+      end
     end
 
     base = mnt.basename.to_s
@@ -141,28 +145,26 @@ module Sundae
   def self.mnts_in_path(path) 
     Pathname.new(path).expand_path
     mnts = []
-    collections = path.children(false).delete_if {|c| c.to_s =~ /^\./}
+    collections = path.children.delete_if {|c| c.basename.to_s =~ /^\./}
 
-    collections.each do |c|
-      collection_mnts = (path + c).children(false).delete_if {|kid| kid.to_s =~ /^\./}
-      collection_mnts.map! { |mnt| (c + mnt) }
-
-      mnts |= collection_mnts # |= is the union
-    end
-
-    return mnts.sort.uniq
+    return collections.map do |c|
+      if c.children(false).include? Pathname.new('.sundae_path')
+        c
+      else
+        collection_mnts = c.children.delete_if {|kid| kid.basename.to_s =~ /^\./}
+        collection_mnts.keep_if { |k| (path + c + k).directory? }
+        collection_mnts.map! { |mnt| (c + mnt) }
+      end
+    end.flatten.sort.uniq
   end
 
   # Return all mnts for every path as an array.
   #
   def self.all_mnts 
-    mnts = []
-
-    @paths.each do |path| 
+    @paths.map do |path| 
       next unless path.exist?
-      mnts |= mnts_in_path(path).map { |mnt| path + mnt } # |= is the union operator
-    end
-    return mnts
+      mnts_in_path(path) # |= is the union operator
+    end.flatten
   end
 
   # Return all subdirectories and files in the mnts returned by
