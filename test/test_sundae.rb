@@ -58,7 +58,7 @@ class TestSundae < Test::Unit::TestCase
     d2   = @@mnts_dir + 'c1/d2'
     link = @@sandbox  + 'link'
     FileUtils.ln_s(d1, link)
-    Sundae.combine_directories(link, d1, d2)
+    Sundae.combine_directories(d1, d2, link)
     assert File.symlink?(link + 'f11')
   end
 
@@ -176,13 +176,13 @@ class TestSundae < Test::Unit::TestCase
     assert (@@sandbox + 'perm_file').exist?
   end
 
-  def test_class_remove_generated_directories
-    Sundae.generated_directories.each { |d| FileUtils.mkdir_p(d) }
-    Sundae.remove_generated_directories
-    Sundae.generated_directories.each do |d|
-      assert ! File.exist?(d)
-    end
-  end
+  # def test_class_remove_generated_directories
+  #   Sundae.generated_directories.each { |d| FileUtils.mkdir_p(d) }
+  #   Sundae.remove_generated_directories
+  #   Sundae.generated_directories.each do |d|
+  #     assert ! File.exist?(d)
+  #   end
+  # end
 
   def test_class_root_path
     assert_equal @@mnts_dir +'c1',  Sundae.root_path(@@mnts_dir + 'c1')

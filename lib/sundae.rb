@@ -200,7 +200,7 @@ module Sundae
       files = location.entries.map { |f| location + f }
       files.each do |file|
         next unless file.symlink?
-        next if file.readlink.exist?
+        next if file.exist?
         next unless root_path(file.readlink)
         file.delete 
       end
@@ -219,22 +219,22 @@ module Sundae
     return nil
   end
 
-  # Delete each generated directory if there aren't any real files in
-  # them.
-  #
-  def self.remove_generated_directories
-    generated_directories.each do |dir| 
-      # don't get rid of the linked config file
-      next if dir.basename.to_s == '.sundae' 
-      remove_generated_stuff dir
+  # # Delete each generated directory if there aren't any real files in
+  # # them.
+  # #
+  # def self.remove_generated_directories
+  #   generated_directories.each do |dir| 
+  #     # don't get rid of the linked config file
+  #     next if dir.basename.to_s == '.sundae' 
+  #     remove_generated_stuff dir
 
-      # if sf = find_static_file(dir)
-      #   puts "found static file: #{sf}"
-      # else
-      #   dir.rmtree
-      # end
-    end
-  end
+  #     # if sf = find_static_file(dir)
+  #     #   puts "found static file: #{sf}"
+  #     # else
+  #     #   dir.rmtree
+  #     # end
+  #   end
+  # end
 
   def self.remove_generated_files
     generated_files.each do |fod| 
@@ -245,7 +245,7 @@ module Sundae
   end
 
   def self.remove_generated_stuff(fod)
-    return unless fod.exist?
+    return unless fod.exist? || fod.symlink?
     if fod.ftype == 'directory'
       fod.each_child do |c|
         remove_generated_stuff c
@@ -266,29 +266,31 @@ module Sundae
     end
   end
 
-  # For each directory and file in _target_, create a link at <em>link_name</em>.  If
-  # there is currently no file at <em>link_path</em>, create a symbolic link there.
+  # For each directory and file in _old_, create a link at <em>link_name</em>.  If
+  # there is currently no file at <em>new</em>, create a symbolic link there.
   # If there is currently a symbolic link, combine the contents at the
-  # link location and _target_ in a new directory and proceed
+  # link location and _old_ in a new directory and proceed
   # recursively.
   #
-  def self.minimally_create_links(target, link_path) 
-    target = File.expand_path(target)
-    link_path = File.expand_path(link_path)
+  def self.minimally_create_links(old, new) 
+    old    = Pathname.new(old)
+    new = Pathname.new(new)
 
-    unless File.exist?(target)
-      raise "attempt to create links from missing directory: " + target
+    unless old.exist?
+      raise "attempt to create links from missing directory: " + old
     end
 
-    Find.find(target) do |path|
-      next if path == target
+    old.realpath.find do |path|
+      next if path == old.realpath
       Find.prune if ignore_file?(File.basename(path))
 
-      rel_path = path.gsub(target, '')
-      link_name = File.join(link_path, rel_path)
-      create_link(path, link_name)
+      rel_path = path.relative_path_from(old.realpath)
+      link_name = new + rel_path
 
-      Find.prune if File.directory?(path) 
+#      puts "#{link_name} -> #{old + rel_path}"
+      create_link(old + rel_path, link_name)
+
+      Find.prune if path.directory?
     end
   end
 
@@ -308,78 +310,83 @@ module Sundae
 
   # Dispatch calls to create_directory_link and create_file_link.
   #
-  def self.create_link(target, link_name) 
-    if File.directory?(target) 
+  def self.create_link(old, new) 
+    old    = Pathname.new(old)
+    new = Pathname.new(new)
+
+    if old.directory?
       begin
-        create_directory_link(target, link_name)
+        create_directory_link(old, new)
       rescue => message
         puts message
       end
-    elsif File.file?(target) 
-      create_file_link(target, link_name)
+    elsif old.file?
+      create_file_link(old, new)
     end
   end
 
-  # Create a symbolic link to <em>target</em> from <em>link_name</em>.
+  # Create a symbolic link to <em>old</em> from <em>new</em>.
   #
-  def self.create_file_link(target, link_name) 
-    raise ArgumentError, "#{target} does not exist" unless File.file?(target)
-    if File.exist?(link_name)
-      raise ArgumentError, "#{link_name} cannot be overwritten for #{target}." unless File.symlink?(link_name)
-      if (not File.exist?(File.readlink(link_name)))
-        FileUtils.ln_sf(target, link_name)
-      else
-        unless (File.expand_path(File.readlink(link_name)) == File.expand_path(target))
-          raise ArgumentError, "#{link_name} points to #{File.readlink(link_name)}, not #{target}" unless File.symlink?(link_name)
-        end
-      end
+  def self.create_file_link(old, new) 
+    old = Pathname.new(old)
+    new = Pathname.new(new)
+
+    raise ArgumentError, "#{old} does not exist" unless old.file? || old.symlink?
+    if new.symlink?
+      raise ArgumentError, "#{new.to_s} cannot be overwritten for #{old}: points to #{new.readlink.to_s}" unless new.readlink.to_s == old.to_s
     else
-      FileUtils.ln_s(target, link_name)
+      raise ArgumentError, "#{new} cannot be overwritten for #{old}." if new.exist?
+      new.make_symlink(old)
     end
   end
 
-  # Create a symbolic link to the directory at <em>target</em> from
-  # <em>link_name</em>, unless <em>link_name</em> already exists.  In that case,
+  # Create a symbolic link to the directory at <em>old</em> from
+  # <em>new</em>, unless <em>new</em> already exists.  In that case,
   # create a directory and recursively run minimally_create_links.
   #
-  def self.create_directory_link(target, link_name) 
-    raise ArgumentError unless File.directory?(target)
-    if (not File.exist?(link_name)) || 
-        (File.symlink?(link_name) && (not File.exist?(File.readlink(link_name))))
-      FileUtils.ln_sf(target, link_name)
+  def self.create_directory_link(old, new) 
+    old = Pathname.new(old)
+    new = Pathname.new(new)
+
+    raise ArgumentError unless old.directory?
+    if not new.exist? || new.symlink?
+      new.make_symlink(old)
     else
-      case File.ftype(link_name)
+      case new.ftype
       when 'file'
-        raise "Could not link #{link_name} to #{target}: target exists."
+        raise "Could not link #{new} to #{old}: old exists."
       when 'directory'
-        minimally_create_links(target, link_name)
+        minimally_create_links(old, new)
       when 'link'
-        case File.ftype(File.readlink(link_name))
+        case new.realpath.ftype
         when 'file'
-          raise "Could not link #{link_name} to #{target}: another link exists there."
+          raise "Could not link #{new} to #{old}: another link exists there."
         when 'directory'
-          combine_directories(link_name, target, File.readlink(link_name))          
+          combine_directories(old, new.readlink, new)   
         end
       end
     end
   end
 
   # Create a directory and create links in it pointing to
-  # <em>target_path1</em> and <em>target_path2</em>.
+  # <em>old1</em> and <em>old2</em>.
   #
-  def self.combine_directories(link_name, target_path1, target_path2) 
-    raise unless File.symlink?(link_name)
-    return if target_path1 == target_path2
+  def self.combine_directories(old1, old2, new) 
+    new = Pathname.new(new)
+    old1 = Pathname.new(old1).expand_path
+    old2 = Pathname.new(old2).expand_path
+
+    raise "combine_directories in #{new}" unless new.symlink?
+    return if old1 == old2
     
-    FileUtils.rm(link_name)
-    FileUtils.mkdir_p(link_name)
-    minimally_create_links(target_path1, link_name)
-    minimally_create_links(target_path2, link_name)
+    new.delete
+    new.mkpath
+    minimally_create_links(old1, new)
+    minimally_create_links(old2, new)
   end
 
   def self.update_filesystem
-    remove_dead_links
-    remove_generated_files
+    remove_filesystem
     create_filesystem
   end
 
