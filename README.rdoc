@@ -133,7 +133,9 @@ For example, the hierarchy in my <em>path</em>s looks sort of like this:
   ~/mnt/sync/            <-- "path"
   |-- reference          <-- "mnt"
   |   |-- .sundae_path   (empty)          
-  |   |-- home/          
+  |   |-- doc/          
+  |       ` ...
+  |   |-- share/          
   |       ` ...
   |-- music
   |   |-- home/          
