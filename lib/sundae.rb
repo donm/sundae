@@ -164,8 +164,8 @@ module Sundae
   def self.all_mnts 
     @paths.map do |path| 
       next unless path.exist?
-      mnts_in_path(path) # |= is the union operator
-    end.flatten
+      mnts_in_path(path)
+    end.compact.flatten
   end
 
   # Return all subdirectories and files in the mnts returned by

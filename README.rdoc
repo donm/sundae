@@ -131,8 +131,9 @@ For example, the hierarchy in my <em>path</em>s looks sort of like this:
   |       ` ... 
   ` ...    
   ~/mnt/sync/            <-- "path"
-  |-- reference          <-- "collection"
-  |   |-- home/          <-- "mnt"
+  |-- reference          <-- "mnt"
+  |   |-- .sundae_path   (empty)          
+  |   |-- home/          
   |       ` ...
   |-- music
   |   |-- home/          
@@ -144,7 +145,7 @@ most of the time you can share a whole folder between computers,
 sometimes you want to mix your config files into a folder that also
 contains nonsymlinked files.
 
-For example, your ~/.ssh folder probably has a public and private key
+For example, your "~/.ssh" folder probably has a public and private key
 that you want to stay unique to that machine, but you might want to
 mix in a "config" file that has host aliases that you share between
 machines.  You can put the file in "~/mnt/nix/.ssh/config" in the
@@ -163,6 +164,9 @@ if you're mixing in one file into "~/a/b/c/d/file", and there are lots
 of files beneath "~/a/", then you don't want sundae to look through
 everything every time it runs.  Just put it in a mnt directory with a
 <tt>.sundae_path</tt> of "~/a/b/c/d".
+
+Again, if you want the first-level subdirectories of a "path" treated
+as a mnt instead of a collection of mnts, just add a .sundae_path file.
 
 == Author
 <don@ohspite.net>
