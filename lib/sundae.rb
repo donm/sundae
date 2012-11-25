@@ -148,6 +148,10 @@ module Sundae
     collections = path.children.delete_if {|c| c.basename.to_s =~ /^\./}
 
     return collections.map do |c|
+      unless c.exist?
+        warn("Skipping mnt: #{c}")
+        next
+      end
       if c.children(false).include? Pathname.new('.sundae_path')
         c
       else
@@ -156,14 +160,17 @@ module Sundae
         collection_mnts.reject! { |k| ! (path + c + k).directory? }
         collection_mnts.map! { |mnt| (c + mnt) }
       end
-    end.flatten.sort.uniq
+    end.flatten.compact.sort.uniq
   end
 
   # Return all mnts for every path as an array.
   #
   def self.all_mnts 
-    @paths.map do |path| 
-      next unless path.exist?
+    @all_mnts ||= @paths.map do |path| 
+      unless path.exist?
+        warn "Path doesn't exist: #{path}"
+        next
+      end
       mnts_in_path(path)
     end.compact.flatten
   end
