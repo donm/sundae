@@ -168,7 +168,9 @@ module Sundae
   def self.all_mnts 
     @all_mnts ||= @paths.map do |path| 
       unless path.exist?
-        warn "Path doesn't exist: #{path}"
+        ## TODO: This should probably only be displayed with some sort
+        ## of verbose option.
+        # warn "Path doesn't exist: #{path}"
         next
       end
       mnts_in_path(path)
